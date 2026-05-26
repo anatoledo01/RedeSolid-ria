@@ -1,0 +1,215 @@
+// =============================================
+// Rede Solidária - Prisma Schema
+// =============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// =============================================
+// Enums
+// =============================================
+
+enum Role {
+  ADMIN
+  DONOR
+  VOLUNTEER
+  RECEIVER
+}
+
+enum DonationStatus {
+  AVAILABLE
+  RESERVED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  ACCEPTED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+// =============================================
+// Models
+// =============================================
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(DONOR)
+  phone     String?
+  avatar    String?
+  isApproved Boolean @default(false) @map("is_approved")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  donationsAsDonor    Donation[]        @relation("DonorDonations")
+  donationsAsReceiver Donation[]        @relation("ReceiverDonations")
+  deliveries          DeliveryRequest[]
+  addresses           Address[]
+  reviewsWritten      Review[]          @relation("ReviewAuthor")
+  reviewsReceived     Review[]          @relation("ReviewTarget")
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+model Donation {
+  id           String         @id @default(uuid())
+  title        String
+  description  String
+  quantity     Int            @default(1)
+  status       DonationStatus @default(AVAILABLE)
+  locationText String?        @map("location_text")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  // Foreign Keys
+  donorId    String  @map("donor_id")
+  receiverId String? @map("receiver_id")
+  categoryId String  @map("category_id")
+
+  // Relations
+  donor      User              @relation("DonorDonations", fields: [donorId], references: [id])
+  receiver   User?             @relation("ReceiverDonations", fields: [receiverId], references: [id])
+  category   Category          @relation(fields: [categoryId], references: [id])
+  images     DonationImage[]
+  deliveries DeliveryRequest[]
+  reviews    Review[]
+
+  @@map("donations")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  donations Donation[]
+
+  @@map("categories")
+}
+
+model DonationImage {
+  id        String   @id @default(uuid())
+  url       String
+  filename  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Foreign Keys
+  donationId String @map("donation_id")
+
+  // Relations
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@map("donation_images")
+}
+
+model DeliveryRequest {
+  id          String         @id @default(uuid())
+  status      DeliveryStatus @default(PENDING)
+  notes       String?
+  acceptedAt  DateTime?      @map("accepted_at")
+  deliveredAt DateTime?      @map("delivered_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Foreign Keys
+  donationId  String @map("donation_id")
+  volunteerId String @map("volunteer_id")
+
+  // Relations
+  donation  Donation @relation(fields: [donationId], references: [id])
+  volunteer User     @relation(fields: [volunteerId], references: [id])
+
+  @@map("delivery_requests")
+}
+
+model Address {
+  id         String  @id @default(uuid())
+  street     String
+  city       String
+  state      String
+  zipCode    String  @map("zip_code")
+  complement String?
+  isDefault  Boolean @default(false) @map("is_default")
+
+  // Foreign Keys
+  userId String @map("user_id")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Foreign Keys
+  authorId   String @map("author_id")
+  targetId   String @map("target_id")
+  donationId String @map("donation_id")
+
+  // Relations
+  author   User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target   User     @relation("ReviewTarget", fields: [targetId], references: [id])
+  donation Donation @relation(fields: [donationId], references: [id])
+
+  @@map("reviews")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Foreign Keys
+  userId String? @map("user_id")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Foreign Keys
+  userId String @map("user_id")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
