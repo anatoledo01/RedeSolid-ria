@@ -8,11 +8,12 @@
     "start": "nest start",
     "dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:push": "npx prisma db push",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:bootstrap": "ts-node prisma/bootstrap.ts",
     "prisma:studio": "npx prisma studio"
   },
   "dependencies": {

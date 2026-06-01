@@ -1,0 +1,67 @@
+# =============================================================
+# Render Blueprint — Rede Solidária
+# =============================================================
+# Provisiona:
+#   - Postgres 16 (free)
+#   - Web service NestJS (free)
+#
+# Como usar:
+#   1. No dashboard do Render → New → Blueprint
+#   2. Conecte o repositório anatoledo01/RedeSolid-ria
+#   3. O Render lê este arquivo e provisiona tudo automaticamente
+#   4. Após o provisionamento, atualize FRONTEND_URL com a URL do Netlify
+# =============================================================
+
+databases:
+  - name: rede-solidaria-db
+    plan: free
+    databaseName: rede_solidaria
+    user: rede_solidaria
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: rede-solidaria-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    # Build: deps → prisma client → compila NestJS
+    buildCommand: npm ci && npx prisma generate && npm run build
+    # Pre-deploy roda antes de cada deploy (cria/atualiza schema +
+    # popula se vazio — idempotente).
+    preDeployCommand: npx prisma db push --accept-data-loss && npx ts-node prisma/bootstrap.ts
+    startCommand: node dist/src/main.js
+    healthCheckPath: /api/docs
+    envVars:
+      # Banco (vem do serviço de DB acima)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rede-solidaria-db
+          property: connectionString
+
+      # JWT — geradas automaticamente no primeiro deploy
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+
+      # App
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"   # Render padrão
+      # ATENÇÃO: após deploy do frontend no Netlify, atualize
+      # FRONTEND_URL com a URL real (ex. https://redesolidaria.netlify.app)
+      - key: FRONTEND_URL
+        value: https://redesolidaria.netlify.app
+
+      # Uploads (placeholder — feature ainda não está implementada)
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: MAX_FILE_SIZE
+        value: "5242880"

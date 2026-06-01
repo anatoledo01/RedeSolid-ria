@@ -1,0 +1,32 @@
+# =============================================================
+# Netlify — Frontend Next.js da Rede Solidária
+# =============================================================
+# Como usar:
+#   1. No dashboard do Netlify → Add new site → Import from Git
+#   2. Conecte o repositório anatoledo01/RedeSolid-ria
+#   3. O Netlify lê este arquivo e configura tudo automaticamente
+#   4. Defina NEXT_PUBLIC_API_URL nas variáveis de ambiente do site
+#      apontando para a URL do backend no Render
+# =============================================================
+
+[build]
+  base    = "frontend"
+  command = "npm ci && npm run build"
+  publish = "frontend/.next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# O plugin oficial do Next.js (instalado automaticamente pelo Netlify)
+# faz o routing serverless do App Router.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Headers de segurança básicos
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options          = "DENY"
+    X-Content-Type-Options   = "nosniff"
+    Referrer-Policy          = "strict-origin-when-cross-origin"
+    Permissions-Policy       = "camera=(), microphone=(), geolocation=()"
