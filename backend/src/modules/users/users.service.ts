@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Prisma, Role } from '@prisma/client';
+import { UserFactory, Action } from '../../domain/users/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -97,8 +98,13 @@ export class UsersService {
   }
 
   async approve(id: string) {
-    await this.findOne(id);
-
+    // Hidrata a entidade de domínio (polimorfismo: dispara a regra
+    // específica da subclasse — ex.: voluntário aprovado libera
+    // delivery:accept).
+    const record = await this.prisma.user.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException('Usuário não encontrado');
+    const domain = UserFactory.fromPrisma(record);
+    domain.approve();
     return this.prisma.user.update({
       where: { id },
       data: { isApproved: true },
@@ -107,13 +113,26 @@ export class UsersService {
   }
 
   async block(id: string) {
-    const user = await this.findOne(id);
-
+    const record = await this.prisma.user.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException('Usuário não encontrado');
+    const domain = UserFactory.fromPrisma(record);
+    if (domain.isActive) domain.block();
+    else domain.unblock();
     return this.prisma.user.update({
       where: { id },
-      data: { isActive: !user.isActive },
+      data: { isActive: domain.isActive },
       select: this.selectFields,
     });
+  }
+
+  /**
+   * Verifica se um usuário pode executar uma ação, delegando ao
+   * domínio (cada subclasse de AbstractUser sobrescreve canPerform).
+   */
+  async can(id: string, action: Action): Promise<boolean> {
+    const record = await this.prisma.user.findUnique({ where: { id } });
+    if (!record) return false;
+    return UserFactory.fromPrisma(record).canPerform(action);
   }
 
   async remove(id: string) {

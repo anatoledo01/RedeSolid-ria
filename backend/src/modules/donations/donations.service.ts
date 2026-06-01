@@ -9,10 +9,34 @@ import { CreateDonationDto } from './dto/create-donation.dto';
 import { UpdateDonationDto } from './dto/update-donation.dto';
 import { QueryDonationDto } from './dto/query-donation.dto';
 import { DonationStatus, Role } from '@prisma/client';
+import {
+  NotificationService,
+  ConsoleNotificationStrategy,
+} from '../../domain/notifications/notification.strategy';
+import {
+  DonationEventBus,
+  NotifyDonorObserver,
+  AuditTrailObserver,
+  DashboardCacheObserver,
+} from '../../domain/events/donation-event-bus';
 
 @Injectable()
 export class DonationsService {
-  constructor(private prisma: PrismaService) {}
+  // Strategy pattern: cliente trabalha com a abstração; a implementação
+  // (console/email/in-app) pode ser trocada sem mexer aqui.
+  private readonly notifier = new NotificationService(
+    new ConsoleNotificationStrategy(),
+  );
+
+  // Observer pattern: bus + observers registrados na criação do
+  // service. Adicionar um novo observer (Webhook, Slack...) é uma linha.
+  private readonly events = new DonationEventBus();
+
+  constructor(private prisma: PrismaService) {
+    this.events.subscribe(new NotifyDonorObserver());
+    this.events.subscribe(new AuditTrailObserver());
+    this.events.subscribe(new DashboardCacheObserver());
+  }
 
   private readonly includeFields = {
     donor: {
@@ -158,11 +182,16 @@ export class DonationsService {
       throw new ForbiddenException('Você não pode alterar o status desta doação');
     }
 
-    return this.prisma.donation.update({
+    const updated = await this.prisma.donation.update({
       where: { id },
       data: { status },
       include: this.includeFields,
     });
+
+    // Observer: publica o evento — Notify, Audit e Cache reagem.
+    await this.events.emit(id, status, userId);
+
+    return updated;
   }
 
   async reserve(id: string, receiverId: string) {
@@ -172,7 +201,7 @@ export class DonationsService {
       throw new BadRequestException('Esta doação não está disponível');
     }
 
-    return this.prisma.donation.update({
+    const updated = await this.prisma.donation.update({
       where: { id },
       data: {
         receiverId,
@@ -180,6 +209,20 @@ export class DonationsService {
       },
       include: this.includeFields,
     });
+
+    // Dispara a notificação para o doador via Strategy.
+    await this.notifier.notify({
+      to: updated.donor.email,
+      subject: `Sua doação “${updated.title}” foi reservada`,
+      body: `Olá ${updated.donor.name}, a doação foi reservada por um ` +
+            `recebedor. Aguarde o voluntário aceitar a entrega.`,
+      metadata: { donationId: id, event: 'RESERVED' },
+    });
+
+    // Observer: publica o evento de reserva.
+    await this.events.emit(id, DonationStatus.RESERVED, receiverId);
+
+    return updated;
   }
 
   async remove(id: string, userId: string, role: Role) {

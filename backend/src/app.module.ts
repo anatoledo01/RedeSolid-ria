@@ -9,7 +9,6 @@ import { DonationsModule } from './modules/donations/donations.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
-import { UploadsModule } from './modules/uploads/uploads.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import configuration from './config/configuration';
@@ -33,7 +32,6 @@ import configuration from './config/configuration';
     CategoriesModule,
     DeliveriesModule,
     ReviewsModule,
-    UploadsModule,
     AdminModule,
   ],
   providers: [
