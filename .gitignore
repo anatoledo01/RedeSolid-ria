@@ -35,3 +35,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Documentos gerados (apresentação, diagramas, scripts de fala, planejamento)
+# — o repositório guarda só o código que os gera, não os artefatos.
+*.pdf
+*.png
+*.pptx
+*.docx
+*.jpg
+*.jpeg
