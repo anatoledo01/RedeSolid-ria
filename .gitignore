@@ -44,3 +44,6 @@ pnpm-debug.log*
 *.docx
 *.jpg
 *.jpeg
+
+# Test coverage reports
+coverage/
